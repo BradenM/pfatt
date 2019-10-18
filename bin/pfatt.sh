@@ -1,9 +1,9 @@
 #!/bin/sh
 set -e
 
-ONT_IF='em0'
-RG_IF='em1'
-RG_ETHER_ADDR='xx:xx:xx:xx:xx:xx'
+ONT_IF='bce0'
+RG_IF='ue0'
+RG_ETHER_ADDR='94:8f:cf:0b:f4:d1'
 OPNSENSE='no'
 LOG=/var/log/pfatt.log
 

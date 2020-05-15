@@ -1,6 +1,6 @@
 # About
 
-This repository includes my notes on enabling a true bridge mode setup with AT&T U-Verse and pfSense. This method utilizes [netgraph](https://www.freebsd.org/cgi/man.cgi?netgraph(4)) which is a graph based kernel networking subsystem of FreeBSD. This low-level solution was required to account for the unique issues surrounding bridging 802.1X traffic and tagging a VLAN with an id of 0. I've tested and confirmed this setup works with AT&T U-Verse Internet on the ARRIS NVG589, NVG599 and BGW210-700 residential gateways (probably others too). For Pace 5268AC, see [issue #5](https://github.com/aus/pfatt/issues/5). 
+This repository includes my notes on enabling a true bridge mode setup with AT&T U-Verse and pfSense. This method utilizes [netgraph](https://www.freebsd.org/cgi/man.cgi?netgraph(4)) which is a graph based kernel networking subsystem of FreeBSD. This low-level solution was required to account for the unique issues surrounding bridging 802.1X traffic and tagging a VLAN with an id of 0. I've tested and confirmed this setup works with AT&T U-Verse Internet on the ARRIS NVG589, NVG599 and BGW210-700 residential gateways (probably others too). For Pace 5268AC see special details below.
 
 There are a few other methods to accomplish true bridge mode, so be sure to see what easiest for you. True Bridge Mode is also possible in a Linux via ebtables or using hardware with a VLAN swap trick. For me, I was not using a Linux-based router and the VLAN swap did not seem to work for me.
 
@@ -63,42 +63,25 @@ But enough talk. Now for the fun part!
 * At least __three__ physical network interfaces on your pfSense server
 * The MAC address of your Residential Gateway
 * Local or console access to pfSense
-* pfSense 2.4.4 _(confirmed working in 2.4.3 too, other versions should work but YMMV)_
+* pfSense 2.4.5 running on amd64 architecture _(If you are running pfSense 2.4.4 please see instruction in the [Before-pfSense-2.4.5 branch](https://github.com/MonkWho/pfatt/blob/Before-pfSense-2.4.5/README.md))_
 
-If you only have two NICs, you can buy this cheap USB 100Mbps NIC [from Amazon](https://amzn.to/2P0yn8k) as your third. It has the Asix AX88772 chipset, which is supported in FreeBSD with the [axe](https://www.freebsd.org/cgi/man.cgi?query=axe&sektion=4) driver. I've confirmed it works in my setup. The driver was already loaded and I didn't have to install or configure anything to get it working. Also, don't worry about the poor performance of USB or 100Mbps NICs. This third NIC will only send/recieve a few packets periodicaly to authenticate your Router Gateway. The rest of your traffic will utilize your other (and much faster) NICs.
+At this time there is a bug in pFsense 2.4.5 and [ng_etf module is only included in pFsense 2.4.5 _amd64 build_](
+https://redmine.pfsense.org/issues/10463). Should be fixed in 2.4.5-p1.
+
+If you are running pfSense on anything other than amd64 architecture you should compile your own version of ng_etf. Look at [Before-pfSense-2.4.5 branch](https://github.com/MonkWho/pfatt/blob/Before-pfSense-2.4.5/README.md) for some guidance on compiling and running your own ng_etf.
+
+If you only have two NICs, you can buy this cheap USB 100Mbps NIC [from Amazon](https://www.amazon.com/gp/product/B00007IFED) as your third. It has the Asix AX88772 chipset, which is supported in FreeBSD with the [axe](https://www.freebsd.org/cgi/man.cgi?query=axe&sektion=4) driver. I've confirmed it works in my setup. The driver was already loaded and I didn't have to install or configure anything to get it working. Also, don't worry about the poor performance of USB or 100Mbps NICs. This third NIC will only send/recieve a few packets periodicaly to authenticate your Router Gateway. The rest of your traffic will utilize your other (and much faster) NICs.
 
 ## Install
 
-1. Copy the `bin/ng_etf.ko` amd64 kernel module to `/boot/kernel` on your pfSense box (because it isn't included):
-
-    a) Use the pre-compiled kernel module from me, a random internet stranger:
-    ```
-    scp bin/ng_etf.ko root@pfsense:/boot/kernel/
-    ssh root@pfsense chmod 555 /boot/kernel/ng_etf.ko
-    ```
-    **NOTE:** The `ng_etf.ko` in this repo was compiled for amd64 from the FreeBSD 11.2 release source code. It may also work on other/future versions of pfSense depending if there have been [significant changes](https://github.com/freebsd/freebsd/commits/master/sys/netgraph/ng_etf.c).  
-
-    b) Or you, a responsible sysadmin, can compile the module yourself from another, trusted FreeBSD machine. _You cannot build packages directly on pfSense._ Your FreeBSD version should match that of your pfSense version. (Example: pfSense 2.4.4 = FreeBSD 11.2)
-    ```
-    # from a FreeBSD machine (not pfSense!)
-    fetch ftp://ftp.freebsd.org/pub/FreeBSD/releases/amd64/amd64/11.2-RELEASE/src.txz
-    tar -C / -zxvf src.txz
-    cd /usr/src/sys/modules/netgraph
-    make
-    scp etf/ng_etf.ko root@pfsense:/boot/kernel/
-    ssh root@pfsense chmod 555 /boot/kernel/ng_etf.ko
-    ```
-
-    **NOTE:** You'll need to tweak your compiler parameters if you need to build for another architecture, like ARM.
-
-2. Edit the following configuration variables in `bin/pfatt.sh` as noted below. `$RG_ETHER_ADDR` should match the MAC address of your Residential Gateway. AT&T will only grant a DHCP lease to the MAC they assigned your device. In my environment, it's:
+1. Edit the following configuration variables in `bin/pfatt.sh` as noted below. `$RG_ETHER_ADDR` should match the MAC address of your Residential Gateway. AT&T will only grant a DHCP lease to the MAC they assigned your device. In my environment, it's:
     ```shell
-    ONT_IF='bce0' # NIC -> ONT / Outside
-    RG_IF='ue0'  # NIC -> Residential Gateway's ONT port
+    ONT_IF='xx0' # NIC -> ONT / Outside
+    RG_IF='xx1'  # NIC -> Residential Gateway's ONT port
     RG_ETHER_ADDR='xx:xx:xx:xx:xx:xx' # MAC address of Residential Gateway
     ```
 
-3. Copy `bin/pfatt.sh` to `/root/bin` (or any directory):
+2. Copy `bin/pfatt.sh` to `/root/bin` (or any directory):
     ```
     ssh root@pfsense mkdir /root/bin
     scp bin/pfatt.sh root@pfsense:/root/bin/
@@ -106,7 +89,7 @@ If you only have two NICs, you can buy this cheap USB 100Mbps NIC [from Amazon](
     ```
     Now edit your `/conf/config.xml` to include `<earlyshellcmd>/root/bin/pfatt.sh</earlyshellcmd>` above `</system>`. 
     
-    **NOTE:** If you have the 5268AC, you'll also need to install `pfatt-5268.sh` due to [issue #5](https://github.com/aus/pfatt/issues/5). The script monitors your connection and disables or enables the EAP bridging as needed. It's a hacky workaround, but it enables you to keep your 5268AC connected, avoid EAP-Logoffs and survive reboots. Consider changing the `PING_HOST` in `pfatt-5268AC.sh` to a reliable host. Then perform these additional steps to install:
+    **NOTE:** If you have the 5268AC, you'll also need to install `pfatt-5268.sh`. The script monitors your connection and disables or enables the EAP bridging as needed. It's a hacky workaround, but it enables you to keep your 5268AC connected, avoid EAP-Logoffs and survive reboots. Consider changing the `PING_HOST` in `pfatt-5268AC.sh` to a reliable host. Then perform these additional steps to install:
 
     Copy `bin/pfatt-5268AC` to `/usr/local/etc/rc.d/`
     
@@ -117,15 +100,15 @@ If you only have two NICs, you can buy this cheap USB 100Mbps NIC [from Amazon](
     ssh root@pfsense chmod +x /usr/local/etc/rc.d/pfatt-5268AC.sh /root/bin/pfatt-5268AC.sh
     ```
 
-4. Connect cables:
+3. Connect cables:
     - `$RG_IF` to Residential Gateway on the ONT port (not the LAN ports!)
     - `$ONT_IF` to ONT (outside)
     - `LAN NIC` to local switch (as normal)
 
-5. Prepare for console access.
-6. Reboot.
-7. pfSense will detect new interfaces on bootup. Follow the prompts on the console to configure `ngeth0` as your pfSense WAN. Your LAN interface should not normally change. However, if you moved or re-purposed your LAN interface for this setup, you'll need to re-apply any existing configuration (like your VLANs) to your new LAN interface. pfSense does not need to manage `$RG_IF` or `$ONT_IF`. I would advise not enabling those interfaces in pfSense as it can cause problems with the netgraph.
-8. In the webConfigurator, configure the  WAN interface (`ngeth0`) to DHCP using the MAC address of your Residential Gateway.
+4. Prepare for console access.
+5. Reboot.
+6. pfSense will detect new interfaces on bootup. Follow the prompts on the console to configure `ngeth0` as your pfSense WAN. Your LAN interface should not normally change. However, if you moved or re-purposed your LAN interface for this setup, you'll need to re-apply any existing configuration (like your VLANs) to your new LAN interface. pfSense does not need to manage `$RG_IF` or `$ONT_IF`. I would advise not enabling those interfaces in pfSense as it can cause problems with the netgraph.
+7. In the webConfigurator, configure the  WAN interface (`ngeth0`) to DHCP using the MAC address of your Residential Gateway.
 
 If everything is setup correctly, netgraph should be bridging EAP traffic between the ONT and RG, tagging the WAN traffic with VLAN0, and your WAN interface configured with an IPv4 address via DHCP.
 
@@ -133,7 +116,7 @@ If everything is setup correctly, netgraph should be bridging EAP traffic betwee
 
 Once your netgraph setup is in place and working, there aren't any netgraph changes required to the setup to get IPv6 working. These instructions can also be followed with a different bypass method other than the netgraph method. Big thanks to @pyrodex1980's [post](http://www.dslreports.com/forum/r32118263-) on DSLReports for sharing your notes.
 
-This setup assumes you have a fairly recent version of pfSense. I'm using 2.4.4.
+This setup assumes you have a fairly recent version of pfSense. I'm using 2.4.5.
 
 **DUID Setup**
 
@@ -308,11 +291,11 @@ There is a whole thread on this at [DSLreports](http://www.dslreports.com/forum/
 However, I don't think this works for everyone. I had to explicitly tag my WAN traffic to VLAN0 which wasn't supported on my switch. 
 
 ## OPNSense / FreeBSD
-For OPNSense (tested and working on 19.1):
+For OPNSense 20.1:
 follow the pfSense instructions, EXCEPT:
-1) modify pfatt.sh to set OPNSENSE='yes'
-2) do *NOT* install the ng_etf.ko, as OPNSense is based on HardenedBSD 11.2, which is in turn based on FreeBSD 11.2 and has the module already installed.
-3) put the pfatt.sh script into `/usr/local/etc/rc.syshook.d/early` as `99-pfatt.sh`
+1) use file opnatt.sh
+2) do *NOT* install the ng_etf.ko, as OPNSense already has this module installed.
+3) put the opnatt.sh script into `/usr/local/etc/rc.syshook.d/early` as `99-opnatt.sh
 4) do *NOT* modify config.xml, nor do any of the duid stuff
 5) note: You *CAN* use IPv6 Prefix id 0, as OPNSense does *NOT* assign a routeable IPv6 address to ngeth0
 

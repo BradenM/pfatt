@@ -1,9 +1,9 @@
 #!/bin/sh
 set -e
 
-ONT_IF='bce0'
-RG_IF='ue0'
-RG_ETHER_ADDR='94:8f:cf:0b:f4:d1'
+ONT_IF='em0'
+RG_IF='em1'
+RG_ETHER_ADDR='xx:xx:xx:xx:xx:xx'
 LOG=/var/log/pfatt.log
 
 getTimestamp(){
@@ -17,9 +17,13 @@ getTimestamp(){
     echo "$(getTimestamp)         RG_IF: $RG_IF"
     echo "$(getTimestamp) RG_ETHER_ADDR: $RG_ETHER_ADDR"
 
-    echo -n "$(getTimestamp) attaching interfaces to ng_ether... "
-    /usr/local/bin/php -r "pfSense_ngctl_attach('.', '$ONT_IF');"
-    /usr/local/bin/php -r "pfSense_ngctl_attach('.', '$RG_IF');"
+    echo -n "$(getTimestamp) loading netgraph kernel modules... "
+    /sbin/kldload -nq netgraph
+    /sbin/kldload -nq ng_ether
+    /sbin/kldload -nq ng_etf
+    /sbin/kldload -nq ng_vlan
+    /sbin/kldload -nq ng_eiface
+    /sbin/kldload -nq ng_one2many
     echo "OK!"
 
     echo "$(getTimestamp) building netgraph nodes..."
